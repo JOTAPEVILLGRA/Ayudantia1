@@ -16,10 +16,10 @@ export function getPrivateProfile(req, res) {
   });
 }
 export async function patchProfile(req, res) {
-  const id = req.user.id;
-  const email = req.body.email;
-  const password = req.body.password;
-
+  const user = req.user;
+  const email = user.gmail;
+  const password = user.password;
+  const id = user.id;
   try {
     const updatedUser = await updateUser(id, { email, password });
     res.status(200).json({ message: "Perfil actualizado", user: updatedUser });
