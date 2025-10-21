@@ -1,7 +1,7 @@
-import { deleteUser } from "../services/user.service.js";
-import { handleSuccess,handleErrorClient } from "../Handlers/responseHandlers.js";
-import { updateUser } from "../services/user.service.js";
-import {userBodyValidation} from "../validations/usuario.validation.js";
+import { updateUser, deleteUser } from "../services/user.service.js";
+import { handleSuccess, handleErrorClient } from "../Handlers/responseHandlers.js";
+import { userBodyValidation } from "../validations/usuario.validation.js";
+
 export function getPublicProfile(req, res) {
   handleSuccess(res, 200, "Perfil público obtenido exitosamente", {
     message: "¡Hola! Este es un perfil público. Cualquiera puede verlo.",
@@ -15,34 +15,47 @@ export function getPrivateProfile(req, res) {
     userData: user,
   });
 }
+
 export async function patchProfile(req, res) {
-  const user = req.user;
-  const email = user.gmail;
-  const password = user.password;
-  const id = user.id;
+  const { id } = req.user || {};
+  if (!id) return handleErrorClient(res, 401, "Usuario no autenticado");
+
   try {
-    
-  const {error}= userBodyValidation.validate(req.body);
-      if (error) {
-      return res.status(400).json({
-     error: error.details.map(detail => detail.message)
-  });
-}
-    const updatedUser = await updateUser(id, { email, password });
-    res.status(200).json({ message: "Perfil actualizado", user: updatedUser });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
+    const { error } = userBodyValidation.validate(req.body);
+    if (error) {
+      return handleErrorClient(
+        res,
+        400,
+        error.details.map((d) => d.message).join(", ")
+      );
+    }
+
+    const { email, password } = req.body;
+    const payload = {};
+    if (typeof email === "string") payload.email = email;
+    if (typeof password === "string" && password.trim() !== "") payload.password = password;
+
+    if (Object.keys(payload).length === 0) {
+      return handleErrorClient(res, 400, "No hay campos para actualizar");
+    }
+
+    const updatedUser = await updateUser(id, payload);
+    if (updatedUser?.password) delete updatedUser.password;
+
+    return handleSuccess(res, 200, "Perfil actualizado", { user: updatedUser });
+  } catch (err) {
+    return handleErrorClient(res, 400, err.message);
   }
 }
+
 export async function deleteProfile(req, res) {
-  const id = req.user.id;
-  if (!id) {
-    return res.status(400).json({ error: "ID de usuario no encontrado en el token." });
-  }
+  const { id } = req.user || {};
+  if (!id) return handleErrorClient(res, 400, "ID de usuario no encontrado en el token.");
+
   try {
     await deleteUser(id);
-    res.status(200).json({ message: "Perfil eliminado exitosamente" });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
+    return handleSuccess(res, 200, "Perfil eliminado exitosamente");
+  } catch (err) {
+    return handleErrorClient(res, 400, err.message);
   }
 }
